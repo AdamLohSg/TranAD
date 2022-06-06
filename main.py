@@ -127,13 +127,14 @@ def backprop(epoch, model, data, dataO, optimizer, scheduler, training = True):
             tqdm.write(f'Epoch {epoch},\tL1 = {np.mean(l1s)}')
             return np.mean(l1s), optimizer.param_groups[0]['lr']
         else:
-            for d, _ in dataloader:
-                window = d.permute(1, 0, 2)
-                elem = window[-1, :, :].view(1, bs, feats)
-                z = model(window, elem)
-                if isinstance(z, tuple): z = z[1]
-            loss = l(z, elem)[0]
-            return loss.detach().numpy(), z.detach().numpy()[0]
+            with torch.no_grad():
+                for d, _ in dataloader:
+                    window = d.permute(1, 0, 2)
+                    elem = window[-1, :, :].view(1, bs, feats)
+                    z = model(window, elem)
+                    if isinstance(z, tuple): z = z[1]
+                loss = l(z, elem)[0]
+                return loss.detach().numpy(), z.detach().numpy()[0]
     else:
         y_pred = model(data)
         loss = l(y_pred, data)

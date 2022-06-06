@@ -55,90 +55,18 @@ def transformstr(df):
 def load_data(dataset):
     folder = os.path.join(output_folder, dataset)
     os.makedirs(folder, exist_ok=True)
-    if dataset == 'synthetic':
-        train_file = os.path.join(data_folder, dataset, 'synthetic_data_with_anomaly-s-1.csv')
-        test_labels = os.path.join(data_folder, dataset, 'test_anomaly.csv')
-        dat = pd.read_csv(train_file, header=None)
-        split = 10000
-        train = normalize(dat.values[:, :split].reshape(split, -1))
-        test = normalize(dat.values[:, split:].reshape(split, -1))
-        lab = pd.read_csv(test_labels, header=None)
-        lab[0] -= split
-        labels = np.zeros(test.shape)
-        for i in range(lab.shape[0]):
-            point = lab.values[i][0]
-            labels[point-30:point+30, lab.values[i][1:]] = 1
-        test += labels * np.random.normal(0.75, 0.1, test.shape)
-        for file in ['train', 'test', 'labels']:
-            np.save(os.path.join(folder, f'{file}.npy'), eval(file))
-    elif dataset == 'SMD':
-        dataset_folder = 'data/SMD'
-        file_list = os.listdir(os.path.join(dataset_folder, "train"))
-        for filename in file_list:
-            if filename.endswith('.txt'):
-                load_and_save('train', filename, filename.strip('.txt'), dataset_folder)
-                s = load_and_save('test', filename, filename.strip('.txt'), dataset_folder)
-                load_and_save2('labels', filename, filename.strip('.txt'), dataset_folder, s)
-    elif dataset == 'UCR':
-        dataset_folder = 'data/UCR'
-        file_list = os.listdir(dataset_folder)
-        for filename in file_list:
-            if not filename.endswith('.txt'): continue
-            vals = filename.split('.')[0].split('_')
-            dnum, vals = int(vals[0]), vals[-3:]
-            vals = [int(i) for i in vals]
-            temp = np.genfromtxt(os.path.join(dataset_folder, filename),
-                                dtype=np.float64,
-                                delimiter=',')
-            min_temp, max_temp = np.min(temp), np.max(temp)
-            temp = (temp - min_temp) / (max_temp - min_temp)
-            train, test = temp[:vals[0]], temp[vals[0]:]
-            labels = np.zeros_like(test)
-            labels[vals[1]-vals[0]:vals[2]-vals[0]] = 1
-            train, test, labels = train.reshape(-1, 1), test.reshape(-1, 1), labels.reshape(-1, 1)
-            for file in ['train', 'test', 'labels']:
-                np.save(os.path.join(folder, f'{dnum}_{file}.npy'), eval(file))
-    elif dataset == 'NAB':
-        dataset_folder = 'data/NAB'
-        file_list = os.listdir(dataset_folder)
-        with open(dataset_folder + '/labels.json') as f:
-            labeldict = json.load(f)
-        for filename in file_list:
-            if not filename.endswith('.csv'): continue
-            df = pd.read_csv(dataset_folder+'/'+filename)
-            vals = df.values[:,1]
-            labels = np.zeros_like(vals, dtype=np.float64)
-            for timestamp in labeldict['realKnownCause/'+filename]:
-                tstamp = timestamp.replace('.000000', '')
-                index = np.where(((df['timestamp'] == tstamp).values + 0) == 1)[0][0]
-                labels[index-4:index+4] = 1
-            min_temp, max_temp = np.min(vals), np.max(vals)
-            vals = (vals - min_temp) / (max_temp - min_temp)
-            train, test = vals.astype(float), vals.astype(float)
-            train, test, labels = train.reshape(-1, 1), test.reshape(-1, 1), labels.reshape(-1, 1)
-            fn = filename.replace('.csv', '')
-            for file in ['train', 'test', 'labels']:
-                np.save(os.path.join(folder, f'{fn}_{file}.npy'), eval(file))
-    elif dataset == 'MSDS':
-        dataset_folder = 'data/MSDS'
-        df_train = pd.read_csv(os.path.join(dataset_folder, 'train.csv'))
-        df_test  = pd.read_csv(os.path.join(dataset_folder, 'test.csv'))
-        df_train, df_test = df_train.values[::5, 1:], df_test.values[::5, 1:]
-        _, min_a, max_a = normalize3(np.concatenate((df_train, df_test), axis=0))
-        train, _, _ = normalize3(df_train, min_a, max_a)
-        test, _, _ = normalize3(df_test, min_a, max_a)
-        labels = pd.read_csv(os.path.join(dataset_folder, 'labels.csv'))
-        labels = labels.values[::1, 1:]
-        for file in ['train', 'test', 'labels']:
-            np.save(os.path.join(folder, f'{file}.npy'), eval(file).astype('float64'))
-    elif dataset == 'SWaT':
-        dataset_folder = 'data/SWaT'
+    if dataset == 'SWaT':
         dataset_folder = 'data/SWaT/'
         df_train = pd.read_csv(dataset_folder + "SWaT_Dataset_Normal_v1.csv")
-        df_train = df_train.drop(['Timestamp', 'Normal/Attack'], axis=1)
-        df_test = pd.read_csv(dataset_folder + "SWaT_Dataset_Attack_v0.csv", sep=';')
+        df_train = df_train.rename(columns=lambda x: x.strip())
+        print("passed")
+        df_train = df_train.drop(columns=['Timestamp', 'Normal/Attack'])
+        df_test = pd.read_csv(dataset_folder + "SWaT_Dataset_Attack_v0.csv")
+        df_test = df_test.rename(columns=lambda x: x.strip())
         labels = [ float(label!= 'Normal' ) for label  in df_test["Normal/Attack"].values]
-        df_test = df_test.drop(['Timestamp', 'Normal/Attack'], axis=1)
+        print("passed labels")
+        df_test = df_test.drop(columns=['Timestamp', 'Normal/Attack'])
+        print("passed df test and train")
         df_train, df_test = transformstr(df_train), transformstr(df_test)
         train, min_a, max_a = normalize3(df_train.values)
         test, _, _ = normalize3(df_test.values, min_a, max_a)
@@ -147,26 +75,6 @@ def load_data(dataset):
         print(train.shape, test.shape, labels.shape)
         for file in ['train', 'test', 'labels']:
             np.save(os.path.join(folder, f'{file}.npy'), eval(file))
-    elif dataset in ['SMAP', 'MSL']:
-        dataset_folder = 'data/SMAP_MSL'
-        file = os.path.join(dataset_folder, 'labeled_anomalies.csv')
-        values = pd.read_csv(file)
-        values = values[values['spacecraft'] == dataset]
-        filenames = values['chan_id'].values.tolist()
-        for fn in filenames:
-            train = np.load(f'{dataset_folder}/train/{fn}.npy')
-            test = np.load(f'{dataset_folder}/test/{fn}.npy')
-            train, min_a, max_a = normalize3(train)
-            test, _, _ = normalize3(test, min_a, max_a)
-            np.save(f'{folder}/{fn}_train.npy', train)
-            np.save(f'{folder}/{fn}_test.npy', test)
-            labels = np.zeros(test.shape)
-            indices = values[values['chan_id'] == fn]['anomaly_sequences'].values[0]
-            indices = indices.replace(']', '').replace('[', '').split(', ')
-            indices = [int(i) for i in indices]
-            for i in range(0, len(indices), 2):
-                labels[indices[i]:indices[i+1], :] = 1
-            np.save(f'{folder}/{fn}_labels.npy', labels)
     elif dataset == 'WADI':
         dataset_folder = 'data/WADI'
         ls = pd.read_csv(os.path.join(dataset_folder, 'WADI_attacklabels.csv'))
@@ -192,20 +100,6 @@ def load_data(dataset):
             labels.loc[(labels['Time'] >= st) & (labels['Time'] <= et), matched] = 1
         train, test, labels = convertNumpy(train), convertNumpy(test), convertNumpy(labels)
         print(train.shape, test.shape, labels.shape)
-        for file in ['train', 'test', 'labels']:
-            np.save(os.path.join(folder, f'{file}.npy'), eval(file))
-    elif dataset == 'MBA':
-        dataset_folder = 'data/MBA'
-        ls = pd.read_excel(os.path.join(dataset_folder, 'labels.xlsx'))
-        train = pd.read_excel(os.path.join(dataset_folder, 'train.xlsx'))
-        test = pd.read_excel(os.path.join(dataset_folder, 'test.xlsx'))
-        train, test = train.values[1:,1:].astype(float), test.values[1:,1:].astype(float)
-        train, min_a, max_a = normalize3(train)
-        test, _, _ = normalize3(test, min_a, max_a)
-        ls = ls.values[:,1].astype(int)
-        labels = np.zeros_like(test)
-        for i in range(-20, 20):
-            labels[ls + i, :] = 1
         for file in ['train', 'test', 'labels']:
             np.save(os.path.join(folder, f'{file}.npy'), eval(file))
     else:
